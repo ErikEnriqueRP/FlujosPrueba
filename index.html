@@ -10,19 +10,45 @@
 <body>
     <header class="header">
         <h1>Flujos de Procesos: Proyecto</h1>
-        <div class="filter-container">
-            <select id="categoryFilter" class="filter-select">
-                <option value="all">Todas las Categorias</option>
-                <option value="bug">Bug</option>
-                <option value="feature">New Feature</option>
-                <option value="design">Design</option>
-                <option value="documentation">Documentation</option>
-            </select>
+        <div class="header-controls">
+            <div class="view-toggle">
+                <button id="viewKanbanBtn" class="view-btn active" onclick="switchView('kanban')">
+                    <i class="fas fa-columns"></i> Tablero Kanban
+                </button>
+                <button id="viewGlobalBtn" class="view-btn" onclick="switchView('global')">
+                    <i class="fas fa-stream"></i> Actividad Global
+                </button>
+            </div>
+            <div class="filter-container">
+                <select id="categoryFilter" class="filter-select">
+                    <option value="all">Todas las Categorias</option>
+                    <option value="bug">Bug</option>
+                    <option value="feature">New Feature</option>
+                    <option value="design">Design</option>
+                    <option value="documentation">Documentation</option>
+                </select>
+            </div>
         </div>
     </header>
 
-    <main class="board" id="board">
-    </main>
+    <div id="kanbanView" class="view-container">
+        <main class="board" id="board">
+        </main>
+    </div>
+
+    <div id="globalFeedView" class="view-container hidden-by-default">
+        <div class="global-feed-container">
+            <h2 class="feed-header">
+                <i class="fas fa-history"></i> Historial de Actividad Global
+            </h2>
+            <div id="globalActivityFeed" class="global-activity-feed">
+                <div class="no-activity-global">
+                    <i class="fas fa-inbox"></i>
+                    <p>No hay actividad registrada en el proyecto.</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="taskModal" class="modal">
         <div class="modal-content">
@@ -75,12 +101,31 @@
                     </div>
                 </div>
 
+                <div class="form-group comment-group">
+                    <label for="updateComment">
+                        <i class="fas fa-comment"></i> Agregar comentario sobre esta actualización (opcional)
+                    </label>
+                    <textarea id="updateComment" rows="2" placeholder="Ej: Esperando aprobación del cliente..."></textarea>
+                </div>
+
                 <div class="form-actions">
                     <button type="button" id="deleteBtn" class="btn btn-danger">Eliminar</button>
+                    <button type="button" id="toggleHistoryBtn" class="btn btn-info" onclick="toggleActivityLog()">
+                        <i class="fas fa-history"></i> Ver Historial
+                    </button>
                     <button type="button" id="cancelBtn" class="btn btn-secondary">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
                 </div>
             </form>
+
+            <div class="activity-section hidden-by-default">
+                <h3 class="activity-title">
+                    <i class="fas fa-clock"></i> Historial de Cambios Detallado
+                </h3>
+                <div id="activityLog" class="activity-log">
+                    <p class="no-activity">No hay actividad registrada aún.</p>
+                </div>
+            </div>
         </div>
     </div>
 

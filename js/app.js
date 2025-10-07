@@ -7,6 +7,10 @@ const closeModal = document.querySelector('.close-btn');
 const cancelBtn = document.getElementById('cancelBtn');
 const deleteBtn = document.getElementById('deleteBtn');
 const categoryFilter = document.getElementById('categoryFilter');
+const globalFeedView = document.getElementById('globalFeedView');
+const kanbanView = document.getElementById('kanbanView');
+
+let currentView = 'kanban';
 
 const columns = [
     { id: 'backlog', title: 'Tareas / Por Hacer' },
@@ -123,7 +127,22 @@ function setupDragAndDrop() {
             e.preventDefault();
             const taskId = e.dataTransfer.getData('text/plain');
             const newStatus = container.dataset.column;
+            
+            const task = Storage.getTaskById(taskId);
+            const oldStatus = task ? task.status : '';
+            const oldColumnName = columns.find(c => c.id === oldStatus)?.title || oldStatus;
+            const newColumnName = columns.find(c => c.id === newStatus)?.title || newStatus;
+            
             Storage.moveTask(taskId, newStatus);
+            if (oldStatus !== newStatus) {
+                const moveDetails = {
+                    field: 'Estado',
+                    oldValue: oldColumnName,
+                    newValue: newColumnName
+                };
+                Storage.addActivity(taskId, 'MOVE', [moveDetails]);
+            }
+            
             loadTasks();
         });
     });
@@ -161,6 +180,8 @@ function openTaskModal(columnId = 'backlog', taskId = '') {
             document.getElementById('department').value = existing.department || '';
             document.getElementById('category').value = existing.category || '';
             taskForm.dataset.columnId = existing.status || 'backlog';
+
+            taskForm.dataset.hasActivity = (existing.activity && existing.activity.length > 0) ? 'true' : 'false';
         }
     } else {
         modalTitle.textContent = 'Añadir Nueva Tarea';
@@ -168,6 +189,8 @@ function openTaskModal(columnId = 'backlog', taskId = '') {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         document.getElementById('endDate').valueAsDate = tomorrow;
+        
+        taskForm.dataset.hasActivity = 'false';
     }
 
     taskModal.style.display = 'flex';
@@ -196,15 +219,36 @@ function handleTaskSubmit(e) {
         status: columnId
     };
 
+    const commentInput = document.getElementById('updateComment');
+    const comment = commentInput ? commentInput.value.trim() : null;
+
     if (isEdit) {
+        const oldTask = Storage.getTaskById(taskId);
+        const changes = Storage.detectChanges(oldTask, taskPayload);
+        
         Storage.updateTask(taskId, taskPayload);
+        
+        if (changes.length > 0) {
+            Storage.addActivity(taskId, 'UPDATE', changes, comment || null);
+        }
     } else {
         taskPayload.id = taskId;
+        const columnName = columns.find(c => c.id === columnId)?.title || columnId;
+        taskPayload.activity = [{
+            timestamp: new Date().toISOString(),
+            eventType: 'CREATE',
+            details: [{ field: 'Estado inicial', newValue: columnName }],
+            comment: comment || null,
+            taskTitle: title
+        }];
         Storage.addTask(taskPayload);
     }
     
+    if (commentInput) commentInput.value = '';
+    
     taskModal.style.display = 'none';
     loadTasks();
+    if (currentView === 'global') renderGlobalFeed();
 }
 
 function handleDeleteTask() {
@@ -294,4 +338,187 @@ function filterTasksByCategory() {
             }
         }
     });
+}
+
+function toggleActivityLog() {
+    const activitySection = document.querySelector('.activity-section');
+    const toggleBtn = document.getElementById('toggleHistoryBtn');
+    const taskId = taskForm.dataset.taskId;
+    
+    if (!activitySection || !toggleBtn) return;
+    
+    const isVisible = !activitySection.classList.contains('hidden-by-default');
+    
+    if (isVisible) {
+        activitySection.classList.add('hidden-by-default');
+        toggleBtn.innerHTML = '<i class="fas fa-history"></i> Ver Historial';
+    } else {
+        activitySection.classList.remove('hidden-by-default');
+        toggleBtn.innerHTML = '<i class="fas fa-history"></i> Ocultar Historial';
+        
+        if (taskId) {
+            const task = Storage.getTaskById(taskId);
+            displayActivityLog(task ? task.activity || [] : []);
+        } else {
+            displayActivityLog([]);
+        }
+    }
+}
+
+function displayActivityLog(activityArray) {
+    const activityContainer = document.getElementById('activityLog');
+    if (!activityContainer) return;
+    
+    if (!activityArray || activityArray.length === 0) {
+        activityContainer.innerHTML = '<p class="no-activity">No hay actividad registrada aún.</p>';
+        return;
+    }
+    
+    const activityHTML = activityArray.map(entry => {
+        const timestamp = formatTimestamp(entry.timestamp);
+        let description = generateActivityDescription(entry);
+        
+        return `
+            <div class="activity-entry">
+                <div class="activity-icon"><i class="fas fa-circle"></i></div>
+                <div class="activity-content">
+                    <div class="activity-description">${description}</div>
+                    ${entry.comment ? `<div class="activity-comment"><i class="fas fa-comment"></i> <strong>Comentario:</strong> ${entry.comment}</div>` : ''}
+                    <p class="activity-time">${timestamp}</p>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    activityContainer.innerHTML = activityHTML;
+}
+
+function generateActivityDescription(entry) {
+    switch (entry.eventType) {
+        case 'CREATE':
+            return '<strong>Tarea creada</strong>';
+        
+        case 'MOVE':
+            if (entry.details && entry.details.length > 0) {
+                const detail = entry.details[0];
+                return `<strong>Tarea movida</strong> de "${detail.oldValue}" a "${detail.newValue}"`;
+            }
+            return '<strong>Tarea movida</strong>';
+        
+        case 'UPDATE':
+            if (entry.details && entry.details.length > 0) {
+                const changesList = entry.details.map(change => 
+                    `<li><strong>${change.field}:</strong> "${change.oldValue}" → "${change.newValue}"</li>`
+                ).join('');
+                return `<strong>Detalles actualizados:</strong><ul class="change-list">${changesList}</ul>`;
+            }
+            return '<strong>Detalles actualizados</strong>';
+        
+        default:
+            return entry.description || 'Acción realizada';
+    }
+}
+
+function formatTimestamp(isoString) {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Justo ahora';
+    if (diffMins < 60) return `Hace ${diffMins} minuto${diffMins > 1 ? 's' : ''}`;
+    if (diffHours < 24) return `Hace ${diffHours} hora${diffHours > 1 ? 's' : ''}`;
+    if (diffDays < 7) return `Hace ${diffDays} día${diffDays > 1 ? 's' : ''}`;
+    
+    const options = { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    };
+    return date.toLocaleDateString('es-MX', options);
+}
+
+function switchView(view) {
+    currentView = view;
+    
+    if (view === 'kanban') {
+        kanbanView.classList.remove('hidden-by-default');
+        globalFeedView.classList.add('hidden-by-default');
+        document.getElementById('viewKanbanBtn').classList.add('active');
+        document.getElementById('viewGlobalBtn').classList.remove('active');
+    } else {
+        kanbanView.classList.add('hidden-by-default');
+        globalFeedView.classList.remove('hidden-by-default');
+        document.getElementById('viewKanbanBtn').classList.remove('active');
+        document.getElementById('viewGlobalBtn').classList.add('active');
+        renderGlobalFeed();
+    }
+}
+
+function renderGlobalFeed() {
+    const feedContainer = document.getElementById('globalActivityFeed');
+    if (!feedContainer) return;
+    
+    const allActivities = Storage.getAllActivities();
+    
+    if (allActivities.length === 0) {
+        feedContainer.innerHTML = '<div class="no-activity-global"><i class="fas fa-inbox"></i><p>No hay actividad registrada en el proyecto.</p></div>';
+        return;
+    }
+    
+    const feedHTML = allActivities.map(entry => {
+        const timestamp = formatTimestamp(entry.timestamp);
+        const description = generateGlobalFeedDescription(entry);
+        
+        return `
+            <div class="global-feed-entry" data-task-id="${entry.taskId}">
+                <div class="feed-timestamp">${timestamp}</div>
+                <div class="feed-content">
+                    <div class="feed-description">${description}</div>
+                    ${entry.comment ? `<div class="feed-comment"><i class="fas fa-comment"></i> ${entry.comment}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    feedContainer.innerHTML = feedHTML;
+    
+    document.querySelectorAll('.global-feed-entry').forEach(entry => {
+        entry.addEventListener('click', () => {
+            const taskId = entry.dataset.taskId;
+            switchView('kanban');
+            setTimeout(() => openTaskModal(undefined, taskId), 100);
+        });
+    });
+}
+
+function generateGlobalFeedDescription(entry) {
+    const taskLink = `<strong class="task-link">${entry.taskTitle}</strong>`;
+    
+    switch (entry.eventType) {
+        case 'CREATE':
+            return `Se creó la tarea ${taskLink}`;
+        
+        case 'MOVE':
+            if (entry.details && entry.details.length > 0) {
+                const detail = entry.details[0];
+                return `Se movió ${taskLink} de "${detail.oldValue}" a "${detail.newValue}"`;
+            }
+            return `Se movió la tarea ${taskLink}`;
+        
+        case 'UPDATE':
+            if (entry.details && entry.details.length > 0) {
+                const fieldCount = entry.details.length;
+                const fieldNames = entry.details.map(d => d.field).join(', ');
+                return `Se actualizó ${taskLink} (${fieldNames})`;
+            }
+            return `Se actualizó la tarea ${taskLink}`;
+        
+        default:
+            return `Acción en la tarea ${taskLink}`;
+    }
 }
