@@ -1,0 +1,112 @@
+Option Explicit
+
+' --- MACRO DE INICIO ---
+Sub IniciarFlujo()
+    ' Oculta todo y prepara el estado inicial.
+    OcultarTodo
+    
+    ' Muestra el primer nivel de decisión.
+    ActiveSheet.Shapes("Circulo_Paso1").Visible = True
+    ActiveSheet.Shapes("Cuadrado_OpcionA").Visible = True
+    ActiveSheet.Shapes("Linea_OpcionA").Visible = True
+    ActiveSheet.Shapes("Boton_SeleccionarA").Visible = True
+    ActiveSheet.Shapes("Cuadrado_OpcionB").Visible = True
+    ActiveSheet.Shapes("Linea_OpcionB").Visible = True
+    ActiveSheet.Shapes("Boton_SeleccionarB").Visible = True
+    
+    ' Ocultamos el botón de inicio.
+    ActiveSheet.Shapes("Boton_Iniciar").Visible = False
+End Sub
+
+' --- MACROS DE DECISIÓN NIVEL 1 ---
+
+Sub SeleccionarOpcionA()
+    ' Ocultamos la ruta B que no se seleccionó.
+    ActiveSheet.Shapes("Cuadrado_OpcionB").Visible = False
+    ActiveSheet.Shapes("Linea_OpcionB").Visible = False
+    ActiveSheet.Shapes("Boton_SeleccionarB").Visible = False
+    
+    ' Ocultamos el botón de selección A para finalizar la decisión.
+    ActiveSheet.Shapes("Boton_SeleccionarA").Visible = False
+    
+    ' ¡NUEVO! Mostramos los botones de navegación.
+    ActiveSheet.Shapes("Boton_Continuar").Visible = True
+    ActiveSheet.Shapes("Boton_Regresar").Visible = True
+End Sub
+
+Sub SeleccionarOpcionB()
+    ' Ocultamos la ruta A.
+    ActiveSheet.Shapes("Cuadrado_OpcionA").Visible = False
+    ActiveSheet.Shapes("Linea_OpcionA").Visible = False
+    ActiveSheet.Shapes("Boton_SeleccionarA").Visible = False
+    
+    ' Ocultamos su propio botón de selección.
+    ActiveSheet.Shapes("Boton_SeleccionarB").Visible = False
+    
+    ' Aquí podrías también mostrar los botones de Continuar/Regresar
+    ' para desarrollar la ruta B en el futuro.
+End Sub
+
+' --- MACROS DE NAVEGACIÓN Y DECISIÓN NIVEL 2 ---
+
+Sub ContinuarDesdeA()
+    ' Esta macro se activa con el botón "Continuar".
+    ' Muestra el siguiente nivel de decisión para la ruta A.
+    ActiveSheet.Shapes("Cuadrado_Paso2A").Visible = True
+    ActiveSheet.Shapes("Linea_Paso2A").Visible = True
+    ActiveSheet.Shapes("Cuadrado_OpcionC").Visible = True
+    ActiveSheet.Shapes("Linea_OpcionC").Visible = True
+    ActiveSheet.Shapes("Boton_SeleccionarC").Visible = True
+    ActiveSheet.Shapes("Cuadrado_OpcionD").Visible = True
+    ActiveSheet.Shapes("Linea_OpcionD").Visible = True
+    ActiveSheet.Shapes("Boton_SeleccionarD").Visible = True
+    
+    ' Ocultamos los botones de navegación una vez usados.
+    ActiveSheet.Shapes("Boton_Continuar").Visible = False
+    ActiveSheet.Shapes("Boton_Regresar").Visible = False
+End Sub
+
+Sub SeleccionarOpcionC()
+    ' Oculta la ruta D que no se seleccionó.
+    ActiveSheet.Shapes("Cuadrado_OpcionD").Visible = False
+    ActiveSheet.Shapes("Linea_OpcionD").Visible = False
+    ActiveSheet.Shapes("Boton_SeleccionarD").Visible = False
+    
+    ' Oculta su propio botón.
+    ActiveSheet.Shapes("Boton_SeleccionarC").Visible = False
+End Sub
+
+Sub SeleccionarOpcionD()
+    ' Oculta la ruta C.
+    ActiveSheet.Shapes("Cuadrado_OpcionC").Visible = False
+    ActiveSheet.Shapes("Linea_OpcionC").Visible = False
+    ActiveSheet.Shapes("Boton_SeleccionarC").Visible = False
+    
+    ' Oculta su propio botón.
+    ActiveSheet.Shapes("Boton_SeleccionarD").Visible = False
+End Sub
+
+' --- MACROS AUXILIARES ---
+
+Sub RegresarAlInicio()
+    ' El botón "Regresar" simplemente vuelve a llamar a la macro de inicio,
+    ' la cual resetea la vista a la primera decisión.
+    IniciarFlujo
+End Sub
+
+Sub OcultarTodo()
+    On Error Resume Next ' Evita errores si una forma ya está oculta.
+    
+    ' Oculta todos los elementos del flujo.
+    Dim shp As Shape
+    For Each shp In ActiveSheet.Shapes
+        If shp.Name <> "Boton_Iniciar" Then
+            shp.Visible = False
+        End If
+    Next shp
+    
+    ' Nos aseguramos de que el botón de inicio esté visible para empezar/reiniciar.
+    ActiveSheet.Shapes("Boton_Iniciar").Visible = True
+    
+    On Error GoTo 0
+End Sub
